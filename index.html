@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Socket.IO Example</title>
+  </head>
+<script>
+  function message(){
+    console.log(1)
+  };
+</script>
+  <body>
+    <h1>Socket.IO Example</h1>
+    <form id="message-form" action="#">
+      <textarea id="message" rows="4" cols="30"></textarea>
+      <input type="submit" value="Send message" />
+      <p id="users"></p>
+      <p id="count"></p>
+    </form>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script>
+    <script>
+      var socket = io.connect('http://127.0.0.1:3000');//连接网址使引进来的可以发送或接收http://127.0.0.1:3000的socket.io
+      var message = document.getElementById('message');
+      socket.on("open",function(){  document.getElementById("users").innerHTML="<p>恭喜你连接成功</p>"   });
+      socket.on("users",function(data){ 
+        document.getElementById("count").innerHTML = "有"+data.number+"人连接到";
+        });
+      $(message.form).submit(function() {
+        socket.emit('message', { text: message.value });
+        $('form').before("<p>"+message.value+"</p>");
+        return false;
+      });
+      socket.on('push message', function (data) {
+        $('form').before("<p>"+data.text+"</p>");
+      });
+  
+    </script>
+  </body>
+</html>
