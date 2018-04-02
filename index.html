@@ -20,7 +20,8 @@
     <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script>
     <script>
-      var socket = io.connect('http://127.0.0.1:3000');//连接网址使引进来的可以发送或接收http://127.0.0.1:3000的socket.io
+      var socket = io.connect('http://127.0.0.1:3000');//连接网址使引进来的可以发送或接收http://127.0.0.1:3000的socket.io。
+      //不是用服务器渲染出来的吗为什么还要设置呢？因为服务器并没有控制到页面中的标签，如页面点击发送时发给谁
       var message = document.getElementById('message');
       socket.on("open",function(){  document.getElementById("users").innerHTML="<p>恭喜你连接成功</p>"   });
       socket.on("users",function(data){ 
