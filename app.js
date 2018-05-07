@@ -19,9 +19,9 @@ io.sockets.on('connection',function(socket){
 count++;
 //用户打开连接执行
 socket.emit("open");
-//执行发送给所有用户(broadcast关键字键值,注意：初始打开的用户没有执行到users，因为需要一个人开启，而去掉关键字的包括自己)
+//执行发送给所有用户(broadcast关键字键值,注意：初始打开的用户没有执行到users，因为需要一个人开启，而去掉关键字的只查询当前触发的，没有就没有执行，不查询其它的)
  socket.broadcast.emit("users",{"number":count});
-//执行发送给单个用户(也就是只发送给当前有监听到users的客户端)
+//执行只发送给当前触发的
  socket.emit('users',{number:count});
 //监听用户输入信息
     socket.on('message',function(data){
