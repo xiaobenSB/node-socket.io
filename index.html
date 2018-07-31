@@ -29,11 +29,11 @@
         });
       $(message.form).submit(function() {
         socket.emit('message', { text: message.value });
-        $('form').before("<p>"+message.value+"</p>");
+        $('form').append("<p>"+message.value+"</p>");
         return false;
       });
       socket.on('push message', function (data) {
-        $('form').before("<p>"+data.text+"</p>");
+        $('form').append("<p>"+data.text+"</p>");
       });
   
     </script>
