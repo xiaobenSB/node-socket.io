@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Socket.IO Example</title>
+  </head>
+<script>
+  function message(){
+    console.log(1)
+  };
+</script>
+  <body>
+    <h1>Socket.IO Example</h1>
+    <form id="message-form" action="#">
+      <textarea id="message" rows="4" cols="30"></textarea>
+      <input type="submit" value="Send message" />
+      <p id="users"></p>
+      <p id="count"></p>
+    </form>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script>
+    <script>
+      var socket = io();//io()为默认连接当前网址
+      //不是用服务器渲染出来的吗为什么还要设置呢？因为服务器并没有控制到页面中的标签，如页面点击发送时发给谁
+
+      var message = document.getElementById('message');
+      socket.on("open",function(){  document.getElementById("users").innerHTML="<p>恭喜你连接成功</p>"   });
+      socket.on("users",function(data){ 
+        document.getElementById("count").innerHTML = "有"+data.number+"人连接到";
+        });
+      $(message.form).submit(function() {
+        socket.emit('message', { text: message.value});
+        
+        return false;
+      });
+      socket.on('push message', function (data) {
+
+        $('form').append("<p>"+data.text+"</p>");
+      });
+
+	  socket.on('sys', function (sysMsg, users) {
+	    console.log(sysMsg,users)
+	  });
+
+	 
+  
+    </script>
+  </body>
+</html>
