@@ -1,6 +1,8 @@
 # node-socket.io
 简单的实时通讯
 
+//多个房间
+ io.to(roomID).to('a').emit('push message',data,roomID);
 
 socket.io上传图片
 
