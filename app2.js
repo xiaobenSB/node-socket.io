@@ -36,7 +36,7 @@ socket.join(roomID);// 加入房间
  socket.emit('users',{number:count});
 //监听用户输入信息
     socket.on('message',function(data){
-        io.to(roomID).emit('push message',data);//这里也用到了所有，所以发送信息那方是开启
+        io.to(roomID).emit('push message',data);//这里也用到了所有roomID，包括当前
 
     });
 //用户断开连接
