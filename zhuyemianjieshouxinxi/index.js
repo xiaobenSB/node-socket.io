@@ -23,7 +23,7 @@ var url = socket.request.headers.referer;
 socket.emit("open");
 socket.join(roomID);// 加入房间
    
-    // 通知房间内人员
+    // 通知a房间内所有人员
     io.to('a').emit('sys',  '加入了房间', roomID);
 	
 //执行发送给所有用户(broadcast关键字键值,注意：发送方没有执行到users，因为socket排除了当前发送者，而去掉关键字的只查询当前触发的，没有就没有执行，不查询其它的)
