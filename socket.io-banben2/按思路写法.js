@@ -69,12 +69,12 @@ socket.join(roomID,()=>{
 //监听主或子客户端用户提交文本并发送给子或主房间
     socket.on('message',function(data){
           	
-        if(data.mainRoom){
+        if(data.mainRoom){   //接收方
 			
 			socket.to(data.mainRoom).emit('message', data, roomID);
 		}
 		
-		if(data.sonRoom){
+		if(data.sonRoom){  //发送方，因为要回复收到了
 			data.mainRoom = roomID;
 			socket.to(data.sonRoom).emit('message',  data);
 		}
