@@ -12,8 +12,7 @@
        3.socket.to(主).emit('x1') 子页面发送数据给主页面 （拿到主页面id,然后改子页面为ID添加）
 	   6.socket.on('x1') 主页面接收到信息 
 	   7.socket.to(子).emit('x1') 主页面发送给子页面告诉它接收到结果了  （拿到子页面ID发送给子页面）
-   
-下面写得太乱了，所以改下思路   
+     
 */
 var http = require('http');
 var fs = require('fs');
