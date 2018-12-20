@@ -76,12 +76,13 @@
 	  //主页面和子页面接收信息处理
    socket.on('message',function(data,sonR){
      
-      if(sonR){
+      if(sonR){  //接收方
 	    $('#socketData').append("<p>"+sonR+"："+data.text+"</p>");  //主页面append
 	    $("#room").append("<option>"+sonR+"</option>");
 	    socket.emit('message', { text: '接收到了', date: Gb_getDateTime(new Date()),sonRoom:sonR});
 		return;
 	  }
+	   //发送方
 	  $('#socketData').append("<p>"+data.mainRoom+"页面："+data.text+"</p>");   //子页面append
    });
 	 
