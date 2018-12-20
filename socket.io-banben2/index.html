@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Socket.IO Example</title>
+  </head>
+<script>
+  function message(){
+    console.log(1)
+  };
+</script>
+  <body>
+    <h1>Socket.IO Example</h1>
+	<div id="zhuRoom">
+
+	</div>
+    <form id="message-form" action="#">
+      <textarea id="message" rows="4" cols="30"></textarea>
+	  <input type="file" id="file" />
+      <p id="users"></p>
+      <p id="count"></p>
+    </form>
+	<div id="socketData">
+	</div>
+	<div id="imgData">
+	</div>
+	 <img src="" id="img" />
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script>
+    <script>
+	//都能看懂的时间获取
+  function Gb_getDateTime(date) {
+    var year = date.getFullYear();
+    var month = date.getMonth() + 1;
+    var day = date.getDate();
+    var hh = date.getHours();
+    var mm = date.getMinutes();
+    var ss = date.getSeconds();
+    return year + "-" + month + "-" + day + " " + hh + ":" + mm + ":" + ss;
+};
+	
+      var socket = io();//io()为默认连接当前网址
+    
+      //不是用服务器渲染出来的吗为什么还要设置呢？因为服务器并没有控制到页面中的标签，如页面点击发送时发给谁
+      var message = document.getElementById('message');
+	  //监听打开
+      socket.on("open",function(){  document.getElementById("users").innerHTML="<p>恭喜你连接成功</p>"   });
+	  //客户端监听限制除了当前触发的路由，不予许有其相同的路由在操作,然后关闭连接
+	   socket.on("checked",function(data){ 
+	   if(data.check === false) { alert('该房间已在其他地方登陆');socket.close()}
+	  });
+	  //监听并获取用户连接数
+      socket.on("users",function(data){ 
+        document.getElementById("count").innerHTML = "有"+data.number+"人连接到";
+        });
+	  //提交文本
+      $(message.form).submit(function() {
+        socket.emit('message', { text: message.value, date: Gb_getDateTime(new Date())});
+        
+        return false;
+      });
+	  //监听并获取返回提交文本数据，并设置有id时通知当前提交文本的客户端收到数据了
+      socket.on('push message', function (data,Id) {
+	   if(Id){
+	             $('#socketData').append("<p>"+Id+":"+data.text+"</p>");
+				// socket.to(Id).emit('xiaoben','接收到了');
+			    $("#room").append("<option>"+Id+"</option>");
+				socket.emit("xiaoben",{"to":Id,"msg":'接收到了',"text":data.text,"date":data.date});
+				 return
+	   }
+	    $('#socketData').append("<p>"+data.text+"</p>");
+      });
+	  //监听并获取上传文件和房间名
+	   socket.on('file', function (data) {
+	   let blob = new Blob([data.file], { type: 'image/*' })
+	   $('#imgData').append('<p>'+data.roomID+'<img src="'+URL.createObjectURL(blob)+'"></p>');
+	   });
+	   //监听并获取主页面有没有接受到文本数据,第二个作用是接收a主页面发送的数据
+	  socket.on('xiaoben', function (data,Id) {
+	   $('#socketData').append("<p>主页面a："+data+"</p>");
+        if(Id){ 	    
+			socket.emit("sonInformation",{"to":Id,"msg":'接收到了'});
+			return;
+		}
+      });
+	  //监听子页面收到主页面信息没
+	  socket.on('sonInformation', function (data) {
+        $('#socketData').append("<p>"+data+"</p>");
+      });
+	  //监听并获取谁加入房间
+	  socket.on('sys', function (sysMsg, users) {
+	    console.log(sysMsg,users)
+	  });
+	 //发送上传文件里的上传数据给监听file事件的
+	 var file = document.getElementById('file');
+                    file.onchange = function () {
+
+					 var fd = new FormData();
+					 fd.append('myfile', this.files[0]);
+					 socket.emit("file",{"file":this.files[0]});
+					}
+  //主/a页面获取所有连接房间
+  if(window.location.pathname === "/a"){
+  
+	 function changeText()
+	  {
+	  var x=document.getElementById("room");
+	   //主/a页面所中房间并发送数据给该房间
+	  socket.emit("mainRomm",{"to":x.options[x.selectedIndex].text,"msg":message.value,"date":Gb_getDateTime(new Date())});
+	  }
+	  
+  $('#zhuRoom').append('<span>注意：select里面的房间值是别人发送信息给a房间时才会显示</span><select id="room"></select><input type="button" onclick="changeText()" value="选中select里的房间，并发送文本框值">'); 
+  }else
+  {
+    $('#message-form').append('<input type="submit" value="Send message" />');
+  }
+
+</script>
+    </script>
+  </body>
+</html>
