@@ -12,7 +12,8 @@
        3.socket.to(主).emit('x1') 子页面发送数据给主页面 （拿到主页面id,然后改子页面为ID添加）
 	   6.socket.on('x1') 主页面接收到信息 
 	   7.socket.to(子).emit('x1') 主页面发送给子页面告诉它接收到结果了  （拿到子页面ID发送给子页面）
-     
+   
+下面写得太乱了，所以改下思路   
 */
 var http = require('http');
 var fs = require('fs');
@@ -49,8 +50,8 @@ if(roomID===''){roomID='/'} //防止根路由为'',导致客户端获取ID后if(
 
 socket.emit("open");
 socket.join(roomID,()=>{
-	 let rooms = Object.keys(socket.rooms);
-    console.log(rooms);
+	/* let rooms = Object.keys(socket.rooms);
+    console.log(rooms);*/
 });// 加入房间
 
     // 通知a房间内人员有人加入房间了，不包括当前，io.to就包括
@@ -62,29 +63,40 @@ socket.join(roomID,()=>{
 	 
 //执行发送给所有用户(broadcast关键字键值,注意：发送方没有执行到users，因为socket排除了当前发送者，而去掉关键字的只查询当前触发的，没有就没有执行，不查询其它的)
  socket.broadcast.emit("users",{"number":count});
-
+console.log(io.sockets.adapter.rooms.a===undefined)
 //执行只发送给当前触发的
  socket.emit('users',{number:count});
  
 //监听主或子客户端用户提交文本并发送给子或主房间
     socket.on('message',function(data){
           	
-        if(data.mainRoom){   //接收方
-			
+        if(data.mainRoom){
+			//主页面不在时提示没人在给子页面(发送数据方)
+			if(io.sockets.adapter.rooms[data.mainRoom]===undefined){
+				data.text = '暂时没有人在';
+				socket.emit('message', data);
+				return;
+			}
 			socket.to(data.mainRoom).emit('message', data, roomID);
+			
 		}
 		
-		if(data.sonRoom){  //发送方，因为要回复收到了
+		if(data.sonRoom){
 			data.mainRoom = roomID;
 			socket.to(data.sonRoom).emit('message',  data);
 		}
 
     });
-    
+   //监听主或子客户端用户上传文件并发送给子或主房间 
     socket.on('file',function(data){
           	
         if(data.mainRoom){
-			
+			if(io.sockets.adapter.rooms[data.mainRoom]===undefined){
+				data.text = '暂时没有人在';
+				console.log(211);
+				socket.emit('message', data);
+				return;
+			}
 			socket.to(data.mainRoom).emit('file', data, roomID);
 		}
 		
