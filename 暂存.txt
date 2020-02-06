@@ -52,7 +52,7 @@
 	*/
 	
       var socket = io.connect('127.0.0.1:3000?roomID='+(Math.random()*10000000).toString(16).substr(0,4)+'-'+(new Date()).getTime()+'-'+Math.random().toString().substr(2,5));//io()为默认连接当前网址
-      var socketConnectStatus = false;
+      var socketConnectStatus = true;
 	  socket.on('connect', ()=> { 
 	      socketConnectStatus = socket.connected;
 		  if(socketConnectStatus){ console.log('连接成功'); };
@@ -106,7 +106,55 @@ var pool  = mysql.createPool({
   database        : 'blog'
 });
 
-module.exports = pool;
+var addSql = 'INSERT INTO node_socket_message(room_id,sender_id,content,type,send_date) VALUES(?,?,?,?,?)';
+var selSql = 'SELECT * FROM node_socket_message WHERE room_id = ?';
+ 
+function insertFun(arr,callback){       //  添加
+	pool.getConnection(function(err, connection) {
+	  if (err) {callback(true,'消息数据库连接失败');return;}; // not connected!
+		  // Use the connection
+		  connection.query(addSql, arr, function (error, results, fields) {
+			 // When done with the connection, release it.
+			 connection.release();
+		 
+			 // Handle error after the release.
+			 if (error) {
+						callback(true,'信息发送失败'); 
+					  }else{
+						callback(false);  
+					  };
+		 
+			 // Don't use the connection here, it has been returned to the pool.
+		  });
+    });
+};
+
+function selectFun(roomID,callback){    //  查询
+	pool.getConnection(function(err, connection) {
+	  if (err) {callback(true,'消息数据库连接失败');return;}; // not connected!
+		  // Use the connection
+		  connection.query(selSql, roomID, function (error, results, fields) {
+			 // When done with the connection, release it.
+			 connection.release();
+		 
+			 // Handle error after the release.
+			 if (error) {
+						callback(true,'获取消息失败'); 
+					  }else{
+						if(results)callback(false,results);  
+					  };
+		 
+			 // Don't use the connection here, it has been returned to the pool.
+		  });
+    });
+};
+
+
+
+module.exports = {
+	select: selectFun,
+	insert: insertFun
+};
 
 
 
@@ -123,29 +171,6 @@ var server = http.createServer(function (req,res){
 }).listen(3000,"127.0.0.1");
 console.log('Server running at http://127.0.0.1:3000/');
 
-var addSql = 'INSERT INTO node_socket_message(room_id,sender_id,content,type,send_date) VALUES(?,?,?,?,?)';
-var selSql = 'SELECT * FROM node_socket_message WHERE room_id = ?';
-
-function mysqlInsert(arr,callback){    //  数据库添加
-	mysql.query(addSql,arr, function (error, results, fields) {
-					  if (error) {
-						callback(true); 
-					  }else{
-						callback(false);  
-					  }
-				});
-};
-
-function mysqlSelect(roomID,callback){    //  数据库查询
-	mysql.query(selSql,roomID, function (error, results, fields) {
-					  if(error) { 
-						callback(true); 
-					  }else{
-						if(results)callback(false,results);
-						// 没有消息就不回调发送了
-					  };					   
-				});
-};
 
 //socket.io监听网址
 var io = require('socket.io').listen(server);
@@ -157,19 +182,22 @@ var io = require('socket.io').listen(server);
 		// 加入房间
 		socket.join(roomID,function(err){
 			if(err) return;
-			mysqlSelect(roomID,function(error,results){
-				 if(error) socket.emit('errMessage','获取消息失败');
-				 for(var d = 0,len = results.length; d < len; d++){
-					 socket.emit('suceessMessage',results[d]);
+			mysql.select(roomID,function(error,results){
+				 if(error) {
+					 socket.emit('errMessage',results);
+				 }else{
+					 for(var d = 0,len = results.length; d < len; d++){
+					    socket.emit('suceessMessage',results[d]);
+				     };
 				 };
 			});
 		});
 
 		//console.log(io.sockets.adapter.rooms);
 		socket.on('message',function(data){
-			mysqlInsert([roomID,data.sender_id,data.content,data.type,data.send_date],function(error){
+			mysql.insert([roomID,data.sender_id,data.content,data.type,data.send_date],function(error,msg){
 				  if(error){
-					  socket.emit('errMessage','信息发送失败');  //socket.emit发送给当前连接
+					  socket.emit('errMessage',msg);  //socket.emit发送给当前连接
 				  }else{
 					  socket.emit('suceessMessage',data);
 					  socket.to(roomID).emit('suceessMessage',data);
@@ -182,5 +210,3 @@ var io = require('socket.io').listen(server);
 		});
 
 	});
-	
-	6DXTHnwa7tiOQLA5lwUk79Os9lks6DG8
