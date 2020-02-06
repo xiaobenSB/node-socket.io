@@ -52,6 +52,18 @@
 	*/
 	
       var socket = io.connect('127.0.0.1:3000?roomID='+(Math.random()*10000000).toString(16).substr(0,4)+'-'+(new Date()).getTime()+'-'+Math.random().toString().substr(2,5));//io()为默认连接当前网址
+      var socketConnectStatus = false;
+	  socket.on('connect', ()=> { 
+	      socketConnectStatus = socket.connected;
+		  if(socketConnectStatus){ console.log('连接成功'); };
+	  });
+	  socket.on('connect_error',(error)=>{
+	     if(socketConnectStatus){
+		    socketConnectStatus = false;
+		    $('#socketData').html('');
+			console.log('连接失败或断开连接');
+		 };
+	  });
     
       var message = document.getElementById('message');
 
