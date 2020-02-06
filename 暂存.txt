@@ -38,9 +38,21 @@
     return year + "-" + month + "-" + day + " " + hh + ":" + mm + ":" + ss;
 };
 	
-      var socket = io.connect('127.0.0.1:3000?roomID=102');//io()为默认连接当前网址
+	//(Math.random()*10000000).toString(16).substr(0,4)+'-'+(new Date()).getTime()+'-'+Math.random().toString().substr(2,5);
+	/*
+		$arr=array_merge(range('a','z'),range('A','Z'),range('0','9'));
+		shuffle($arr);
+		$arr=array_flip($arr);
+		$arr=array_rand($arr,4);
+		$res='';
+		foreach ($arr as $v){
+			$res.=$v;
+		}
+		echo $res.'-'.time();
+	*/
+	
+      var socket = io.connect('127.0.0.1:3000?roomID='+(Math.random()*10000000).toString(16).substr(0,4)+'-'+(new Date()).getTime()+'-'+Math.random().toString().substr(2,5));//io()为默认连接当前网址
     
-      //不是用服务器渲染出来的吗为什么还要设置呢？因为服务器并没有控制到页面中的标签，如页面点击发送时发给谁
       var message = document.getElementById('message');
 
 		
@@ -51,19 +63,20 @@
 		   alert('请输入文字！');
 		   return false;  //防止from跳转
 		 }
-        socket.emit('message', { text: message.value, date: Gb_getDateTime(new Date()),needSendRoom:'102'});
+        socket.emit('message',{ sender_id: '11', content: message.value, type: 'text', send_date: Gb_getDateTime(new Date()) });
         
         return false;
       });
-	  
-	  //主页面和子页面接收信息处理
-   socket.on('message',function(data){
-	  $('#socketData').append("<p>"+data.needSendRoom+"页面："+data.text+"</p>");  
-   });	
+
+	  socket.on('errMessage',function(data){
+		  alert(data);
+	  });
+	   
+	  socket.on('suceessMessage',function(data){
+	      if(data.sender_id == '11')console.log('这是后台发的消息');
+		  $('#socketData').append("<p>"+data.content+"</p>");  
+	  });	
    
-   socket.on('errMessage',function(data){
-	  alert(data);
-   });
 	
    $('#message-form').append('<input type="submit" value="Send message" />');	
 
@@ -71,6 +84,19 @@
 
   </body>
 </html>
+
+var mysql = require('mysql');
+var pool  = mysql.createPool({
+  connectionLimit : 10,
+  host            : '127.0.0.1',
+  user            : 'root',
+  password        : '123456',
+  database        : 'blog'
+});
+
+module.exports = pool;
+
+
 
 var http = require('http');
 var fs = require('fs');
@@ -84,58 +110,63 @@ var server = http.createServer(function (req,res){
     });
 }).listen(3000,"127.0.0.1");
 console.log('Server running at http://127.0.0.1:3000/');
+
+var addSql = 'INSERT INTO node_socket_message(room_id,sender_id,content,type,send_date) VALUES(?,?,?,?,?)';
+var selSql = 'SELECT * FROM node_socket_message WHERE room_id = ?';
+
+function mysqlInsert(arr,callback){    //  数据库添加
+	mysql.query(addSql,arr, function (error, results, fields) {
+					  if (error) {
+						callback(true); 
+					  }else{
+						callback(false);  
+					  }
+				});
+};
+
+function mysqlSelect(roomID,callback){    //  数据库查询
+	mysql.query(selSql,roomID, function (error, results, fields) {
+					  if(error) { 
+						callback(true); 
+					  }else{
+						if(results)callback(false,results);
+						// 没有消息就不回调发送了
+					  };					   
+				});
+};
+
 //socket.io监听网址
 var io = require('socket.io').listen(server);
+	io.sockets.on('connection',function(socket){
 
-var addSql = 'INSERT INTO node_socket_message(room_id,content,type,send_date) VALUES(?,?,?,?)';
-
-//sockets是监听然后操作返回callback或者是执行再执行callback，callback是默认执行的（所以执行里的第二个没数据可以不用写），除非你传数据他会执行并返回数据
-//connection是当打开网站时执行并返回这个网站内的事件处理者（socket）
-io.sockets.on('connection',function(socket){
-
-	var roomID = socket.handshake.query.roomID;  // 获取房间ID
-    console.log(roomID);
-	
-	// 加入房间
-	socket.join(roomID);
-
-    console.log(io.sockets.adapter.rooms);
- 
-//监听主或子客户端用户提交文本并发送给子或主房间
-    socket.on('message',function(data){
-        console.log(13456,roomID);  	
-		if(io.sockets.adapter.rooms[data.needSendRoom]===undefined){
-			console.log('暂时没人在，发送的内容为：' + data.text);
-			mysql.query(addSql,[data.needSendRoom,data.text,'text',new Date().getTime()], function (error, results, fields) {
-				  if (error) socket.emit('errMessage','信息发送失败');  //socket.emit发送给当前连接
-				  socket.emit('suceessMessage',data);
+		var roomID = socket.handshake.query.roomID;  // 获取房间ID
+		//console.log(roomID);
+		
+		// 加入房间
+		socket.join(roomID,function(err){
+			if(err) return;
+			mysqlSelect(roomID,function(error,results){
+				 if(error) socket.emit('errMessage','获取消息失败');
+				 for(var d = 0,len = results.length; d < len; d++){
+					 socket.emit('suceessMessage',results[d]);
+				 };
 			});
-		}else{
-			mysql.query(addSql,[data.needSendRoom,data.text,'text',new Date().getTime()], function (error, results, fields) {
-				  if (error) socket.emit('errMessage','信息发送失败');
-				  socket.to(data.needSendRoom).emit('message',data);
+		});
+
+		//console.log(io.sockets.adapter.rooms);
+		socket.on('message',function(data){
+			mysqlInsert([roomID,data.sender_id,data.content,data.type,data.send_date],function(error){
+				  if(error){
+					  socket.emit('errMessage','信息发送失败');  //socket.emit发送给当前连接
+				  }else{
+					  socket.emit('suceessMessage',data);
+					  socket.to(roomID).emit('suceessMessage',data);
+				  };
 			});
-		};
+		});
+		
+		socket.on('disconnect',function(){		
+		   socket.leave(roomID);
+		});
 
-    });
-	
-	socket.on('disconnect',function(){ 
-       socket.leave(roomID);
-    });
-
-});
-
-var mysql = require('mysql');
-var pool  = mysql.createPool({
-  connectionLimit : 10,
-  host            : '127.0.0.1',
-  user            : 'root',
-  password        : '123456',
-  database        : 'blog'
-});
-
-pool.on('release', function (connection) {
-	console.log('Connection %d released', connection.threadId);
-});
-
-module.exports = pool;
+	});
