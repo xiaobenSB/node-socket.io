@@ -1,0 +1,170 @@
+    /**
+     * 佣金结算列表
+     */
+    public function commission()
+    {
+        $users = Cache::remember('users', 10, function () {
+            return User::with('basics')->where('is_admin', 0)->where('is_deleted', 0)->orderBy(\DB::raw('convert(`cn_name` using gbk)'))->get();
+        });
+
+        try {
+            $orders = DB::transaction(function () {
+
+               $requestHasUser = !empty(request()->user);
+               $requestHasCategory = !empty(request()->category);
+               $requestHasCompany_name = !empty(request()->company_name);
+               $requestHasProduct_name = !empty(request()->product_name);
+               $requestHasType = request()->type == null ? false : true;
+               $requestHasStartAndEnd = !empty(request()->start)  && !empty(request()->end);
+               $requestHasStatus = !empty(request()->status);
+               $requestHasFuzzytext = !empty(request()->fuzzytext);
+
+               $order_infosTable = [];
+               $product_mainsTable = [];
+               $order_feeTable = [];
+               $person_member_basicsTable = [];
+
+
+               // request()->has('user') 和 request()->has('category')
+               if($requestHasCategory){
+                   if($requestHasCompany_name){
+                       $order_infosTable = DB::table('order_infos')->when($requestHasUser,function($query){
+                           return $query->where('user_id',request()->use);
+                       })->where('category', request()->category)->distinct()->pluck('product_id')->toArray();
+                   }else{
+                       $order_infosTable = DB::table('order_infos')->when($requestHasUser,function($query){
+                           return $query->where('user_id',request()->use);
+                       })->where('category', request()->category)->distinct()->pluck('order_no')->toArray();
+                   };
+               };
+               // request()->has('company_name')
+               if($requestHasCompany_name){
+                   if($requestHasProduct_name){
+                       $product_mainsTable = DB::table('product_mains')->where('removed', 0)->where('company_name', request()->company_name)->when($order_infosTable,function($query,$order_infosTable){
+                           return $query->whereIn('product_id',$order_infosTable);
+                       })->pluck('id')->toArray();
+                   }else{
+                       $product_mainsTable = DB::table('product_mains')->where('removed', 0)->where('company_name', request()->company_name)->when($order_infosTable,function($query,$order_infosTable){
+                           return $query->whereIn('product_id',$order_infosTable);
+                       })->distinct()->pluck('product_id')->toArray();
+                   }
+               };
+               // request()->has('product_name')
+               if($requestHasProduct_name){
+                   $product_mainsTable = DB::table('product_insurances')->when($product_mainsTable,function($query,$product_mainsTable){
+                       return $query->whereIn('product_main_id',$product_mainsTable);
+                   })->where('product_name', 'like', '%'.request()->product_name.'%')->join('product_mains', 'product_mains.id', '=', 'product_insurances.product_main_id')->distinct()->pluck('product_mains.product_id')->toArray();
+               };
+               if($product_mainsTable){
+                   $order_infosTable = DB::table('order_infos')->whereIn('product_id',$product_mainsTable)->distinct()->pluck('order_no')->toArray();
+               };
+
+                // request()->has('type') 和 request()->has('start') 和 request()->has('end')
+               if($requestHasStartAndEnd){
+                   $order_feeTable = DB::table('order_fee')->when($order_infosTable,function($query,$order_infosTable){
+                       return $query->whereIn('order_id',$order_infosTable);
+                   })->when($requestHasType,function($query){
+                       return $query->where('type',request()->type);
+                   })->pluck('id')->toArray();
+                   $between = [date('Y-m-d', strtotime(request()->start)), date('Y-m-d', strtotime(request()->end))];
+
+                   $order_feeTable = DB::table('order_fee_item')->whereBetween('ftime',$between)->whereIn('fee_id',$order_feeTable)->distinct()->join('order_fee','order_fee.id','=','order_fee_item.fee_id')->select('order_fee.*')->pluck('id')->toArray();
+
+               }else{
+                       $order_feeTable = DB::table('order_fee')->when($order_infosTable,function($query,$order_infosTable){
+                           return $query->whereIn('order_id',$order_infosTable);
+                       })->when($requestHasType,function($query){
+                           return $query->where('type',request()->type);
+                       })->pluck('id')->toArray();
+               };
+
+               if($requestHasStatus){
+                   $requestStatus = $this->commission_reqStatus();
+                   $requestStatusArr = explode(",", $requestStatus);
+                   $order_feeTable = DB::table('order_fee_item')->where('status_1',$requestStatusArr[0])->where('status_2',$requestStatusArr[1])->whereIn('fee_id',$order_feeTable)->distinct()->join('order_fee','order_fee.id','=','order_fee_item.fee_id')->select('order_fee.*')->pluck('id')->toArray();
+               };
+
+               // request()->has('fuzzytext')
+                $order_confirmedsGet = false;
+                $person_member_basicsGet = false;
+                $product_insurancesGet = false;
+
+                if($requestHasFuzzytext){
+                    switch($this->commission_reqFuzzytext()){
+                        case 'order_confirmeds':
+                            $order_confirmedsGet = true;
+                            break;
+                        case 'person_member_basics':
+                            $person_member_basicsGet = true;
+                            break;
+                        case 'product_insurances':
+                            $product_insurances = true;
+                            break;
+                    };
+                };
+
+               return OrderFee::whereIn('id',$order_feeTable)->when($order_confirmedsGet,function ($build) {
+                   return $build->WhereHas('order_info.oic', function ($q) {
+                       return $q->where('turnover','like',"%".request()->fuzzytext."%");
+                   });
+               })->when($person_member_basicsGet,function ($build) {
+                   return $build->WhereHas('order_info.client.basics', function ($q) {
+                       return $q->where('member_no','like',"%".request()->fuzzytext."%")->orWhere('member_no','like',"%".request()->fuzzytext."%");
+                   });
+               })->when($product_insurancesGet,function ($build) {
+                   return $build->WhereHas('order_info.product_one.insurance', function ($q) {
+                       return $q->where('product_name', "%".request()->fuzzytext."%");
+                   });
+               })->latest()->with(['order_info', 'fee_item', 'feeItemStatusTrue'])->paginate(20);
+
+            }, 5);
+        }catch (Exception $e){
+             dd('数据库查询失败');
+             exit();
+        };
+
+      /*  $orders = OrderFee::filterCondition()->latest()->with(['order_info', 'fee_item', 'feeItemStatusTrue'])->paginate(20); */
+        return view('admin.finance.commission', compact('orders', 'users'));
+    }
+
+    /**
+     * 佣金结算列表之查询请求的status对应状态处理
+     */
+    public function commission_reqStatus(){
+        $status = request()->status;
+            $st = null;
+            switch ($status){
+                case "待确认":
+                    $st = '0,0';
+                    break;
+                case "待用户确认":
+                    $st = '20001,0';
+                    break;
+                case "待发放":
+                    $st = '20000,0';
+                    break;
+                case "已发放":
+                    $st = '20000,20000';
+                    break;
+            }
+            return $st;
+    }
+
+    /**
+     * 佣金结算列表之查询请求的fuzzytext对应数据
+     */
+    public function commission_reqFuzzytext(){
+
+        $order_confirmedsTableCount = DB::table('order_confirmeds')->where('turnover','like',"%".request()->fuzzytext."%")->count();
+        if($order_confirmedsTableCount) return 'order_confirmeds';
+
+        $person_member_basicsTableCount = DB::table('person_member_basics')->where('member_no','like',"%".request()->fuzzytext."%")->orWhere('member_no','like',"%".request()->fuzzytext."%")->count();
+        if($person_member_basicsTableCount) return 'person_member_basics';
+
+        /*$order_insurance_infosTable = DB::table('order_insurance_infos')->where('chinese_name', 'like', "%".request()->fuzzytext."%")->orWhere('chinese_name_2', 'like', "%".request()->fuzzytext."%")->get()->toArray();
+        if($order_insurance_infosTable) return 'order_insurance_infos';*/
+
+        $product_insurancesTableCount = DB::table('product_insurances')->where('product_name', "%".request()->fuzzytext."%")->count();
+        if($product_insurancesTableCount) return 'product_insurances';
+
+    }
