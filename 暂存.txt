@@ -124,9 +124,22 @@ var ioTwo = require('socket.io').listen(serverTwo);
 				  if(error){
 					  socket.emit('errMessage',msg);  //socket.emit发送给当前连接
 				  }else{
+				          data.id = msg.insertId;
 					  socket.emit('suceessMessage',data);
 					  socket.to(roomID).emit('suceessMessage',data);
 				  };
+			});
+		});
+		
+	        //删除指定id消息
+		socket.on('deleteMessage',function(data){
+			mysql.delete(data.tableID,function(error,msg){
+				 if(error) {
+					 socket.emit('errMessage',msg);
+				 }else{
+					 socket.emit('deleteMessage',data);
+					 socket.to(roomID).emit('deleteMessage',data);
+				 };
 			});
 		});
 		
@@ -148,6 +161,7 @@ var pool  = mysql.createPool({
 
 var addSql = 'INSERT INTO node_socket_message(room_id,sender_id,content,file_name,type,service,send_date) VALUES(?,?,?,?,?,?,?)';
 var selSql = 'SELECT * FROM node_socket_message WHERE room_id = ? AND service = ?';
+var delSql = 'DELETE FROM node_socket_message WHERE id = ?'; 
  
 function insertFun(arr,callback){       //  添加
 	pool.getConnection(function(err, connection) {
@@ -159,7 +173,7 @@ function insertFun(arr,callback){       //  添加
 		 
 			 // Handle error after the release.
 			 if (error) {
-						callback(true,'信息发送失败'); 
+						callback(true,'消息发送失败'); 
 					  }else{
 						callback(false);  
 					  };
@@ -193,10 +207,31 @@ function selectFun(roomID,service,callback){    //  查询
     });
 };
 
+function deleteFun(id,callback){       //  删除
+	pool.getConnection(function(err, connection) {
+	  if (err) {callback(true,'消息数据库连接失败');return;}; // not connected!
+		  // Use the connection
+		  connection.query(delSql, id, function (error, results, fields) {
+			 // When done with the connection, release it.
+			 connection.release();
+		 
+			 // Handle error after the release.
+			 if (error) {
+						callback(true,'消息删除失败'); 
+					  }else{
+						callback(false);  
+					  };
+		 
+			 // Don't use the connection here, it has been returned to the pool.
+		  });
+    });
+};
+
 
 
 module.exports = {
 	select: selectFun,
-	insert: insertFun
+	insert: insertFun,
+	delete: deleteFun
 };	
 	
