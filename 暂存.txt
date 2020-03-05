@@ -12,7 +12,7 @@ var server = http.createServer(function(req,res){
     res.setHeader('Access-Control-Allow-Methods', 'PUT, GET, POST, DELETE, OPTIONS');
     res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,token");
 }).listen(httpPort,"127.0.0.1");
-//console.log('Server running at http://172.18.219.85:3000/');
+//console.log('Server running at http:///');
 
 const options = {
   key: fs.readFileSync('3449933_node.hygeia520.com.key'),
@@ -25,8 +25,8 @@ var serverTwo = https.createServer(options,function(req,res){
 	if(req.url == '/'){
 		res.end('ok');
 	};
-}).listen(3000,"172.18.219.85");
-//console.log('Server running at https://172.18.219.85:3000/');
+}).listen(3000,"");
+//console.log('Server running at https:///');
 
 /*net.createServer(function(socket){
   socket.once('data', function(buf){
@@ -154,9 +154,9 @@ var mysql = require('mysql');
 var pool  = mysql.createPool({
   connectionLimit : 10,
   host            : 'test.richesme.com',
-  user            : 'dev_richesme',
-  password        : '6DXTHnwa7tiOQLA5lwUk79Os9lks6DG8',
-  database        : 'dev_richesme'
+  user            : '',
+  password        : '',
+  database        : ''
 });
 
 var addSql = 'INSERT INTO node_socket_message(room_id,sender_id,content,file_name,type,service,send_date) VALUES(?,?,?,?,?,?,?)';
